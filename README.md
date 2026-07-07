@@ -1,12 +1,34 @@
 # Conservation Statistics
 
-Open-source program for Yale researchers to analyze 2022 and 2023 survey stats. Developed for the [Yale School of the Environment](https://environment.yale.edu/).
+Conservation Statistics is an R toolkit for forestry survey analysis: plot and stand summaries for Yale conservation research.
 
-To clone this repository:
+The project converts raw forestry survey data into reproducible plot-level and stand-level summaries. It was developed for researchers at the [Yale School of the Environment](https://environment.yale.edu/) to analyze 2022 and 2023 field survey results across treatment, tree, regeneration, and damage metrics.
 
-    git clone https://github.com/harley-zhang/Conservation_summary
+## Clone
 
-## Plot statistics
+```bash
+git clone https://github.com/harleyhzhang/Conservation_statistics
+```
+
+## Outputs
+
+- Plot-level summary CSVs for 2022 and 2023 surveys.
+- Stand-level summary CSVs for forest stand analysis.
+- R scripts for regenerating summaries from cleaned survey data.
+
+## Run
+
+Install R with `dplyr`, `tidyr` and `stringr`, then run from the repository root (stand statistics read the plot summaries):
+
+```bash
+Rscript plot_stats/2022/2022_summary_code.R
+Rscript plot_stats/2023/2023_summary_code.R
+Rscript stand_stats/stand_summary.R
+```
+
+`common.R` holds the shared species and damage lookups and summary helpers.
+
+## Plot Statistics
 
 ### Treatment statistics:
 - **Treatment year:** The year each plot was treated.
@@ -28,7 +50,7 @@ To clone this repository:
 - **Browse presence:** Identifies if browse damage is present in each plot (Y/N).
 - **List of damage types:** Lists each type of damage present in each plot.
 
-## Forest stand statistics
+## Forest Stand Statistics
 
 ### Tree statistics:
 - **Basal area per acre:** Calculates basal area in inches per acre for living trees.
@@ -45,3 +67,13 @@ To clone this repository:
 - **Insect damage presence::** Calculates the number and percent of plots with insect damage in each stand.
 - **Browse damage presence::** Calculates the number and percent of plots with browsing damage in each stand.
 - **List of damage types:** Lists all damage present across all plots within a stand.
+
+## Tech Stack
+
+- R
+- CSV survey datasets
+- Reproducible data analysis scripts
+
+## Project Context
+
+The analysis supports conservation research by standardizing forestry measurements into reusable summaries. Plot scripts produce per-plot metrics, while stand scripts aggregate those measurements into stand-level statistics for treatment and ecosystem analysis.

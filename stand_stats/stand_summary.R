@@ -1,32 +1,23 @@
-# Load required libraries
-library(dplyr)
-library(tidyr)
-library(stringr)
+source("common.R")
 
 # Step 1: Read in raw/input CSVs
-summary_2022 <- read.csv("/Users/harley/Documents/Github/Trinchera_summary/plot_stats/2022/2022_summary.csv")
-summary_2023 <- read.csv("/Users/harley/Documents/Github/Trinchera_summary/plot_stats/2023/2023_summary.csv")
-stand_plots <- read.csv("/Users/harley/Documents/Github/Trinchera_summary/stand_stats/stand_plots.csv")
+summary_2022 <- read.csv("plot_stats/2022/2022_summary.csv")
+summary_2023 <- read.csv("plot_stats/2023/2023_summary.csv")
+stand_plots <- read.csv("stand_stats/stand_plots.csv")
 
 # Step 2: Convert data frames all to <character>
-summary_2022 <- summary_2022 %>%
-  mutate(treatment_year = as.character(treatment_year),
-         basal_area_per_acre_in = as.numeric(basal_area_per_acre_in),
-         average_dbh_in = as.numeric(average_dbh_in),
-         average_height_ft = as.numeric(average_height_ft)) %>%
-  rename(dominant_tree = dominant_tree_species,
-         dominant_regeneration = dominant_regeneration_species)
-
-summary_2023 <- summary_2023 %>%
-  mutate(treatment_year = as.character(treatment_year),
-         basal_area_per_acre_in = as.numeric(basal_area_per_acre_in),
-         average_dbh_in = as.numeric(average_dbh_in),
-         average_height_ft = as.numeric(average_height_ft)) %>%
-  rename(dominant_tree = dominant_tree_species,
-         dominant_regeneration = dominant_regeneration_species)
+prepare_summary <- function(summary) {
+  summary %>%
+    mutate(treatment_year = as.character(treatment_year),
+           basal_area_per_acre_in = as.numeric(basal_area_per_acre_in),
+           average_dbh_in = as.numeric(average_dbh_in),
+           average_height_ft = as.numeric(average_height_ft)) %>%
+    rename(dominant_tree = dominant_tree_species,
+           dominant_regeneration = dominant_regeneration_species)
+}
 
 # Step 3: Merge data frames
-summary_merged <- bind_rows(summary_2022, summary_2023)
+summary_merged <- bind_rows(prepare_summary(summary_2022), prepare_summary(summary_2023))
 
 # Step 4: Assign stands to each plot in the merged data frame
 summary_merged <- right_join(stand_plots, summary_merged, by = "plot")
@@ -58,140 +49,62 @@ summary_merged <- summary_merged %>%
     dominant_regeneration = sapply(dominant_regeneration, remove_second_dom)
   )
 
+stand_data <- summary_merged %>%
+  filter(!is.na(stand))
+
 
 #### TREE STATISTICS ####
 
 # Step 5: Average basal area per acre (in)
-average_basal_area_per_acre_in <- summary_merged %>%
-  filter(!is.na(stand)) %>%
+average_basal_area_per_acre_in <- stand_data %>%
   group_by(stand) %>%
   summarise(average_basal_area_per_acre_in = round(mean(basal_area_per_acre_in), 2))
 
 # Step 6: Average DBH (in)
-average_dbh_in <- summary_merged %>%
-  filter(!is.na(stand)) %>%
+average_dbh_in <- stand_data %>%
   group_by(stand) %>%
   summarise(average_dbh_in = round(mean(average_dbh_in), 2))
 
 # Step 7: Average height (ft)
-average_height_ft <- summary_merged %>%
-  filter(!is.na(stand)) %>%
+average_height_ft <- stand_data %>%
   group_by(stand) %>%
   summarise(average_height_ft = round(mean(average_height_ft), 2))
 
 # Step 8: Dominant tree species
-dominant_tree_species <- summary_merged %>%
-  filter(!is.na(stand)) %>%
-  mutate(dominant_tree = str_extract_all(dominant_tree, "(Aspen|Douglas fir|Colorado Pinyon|Engelmann spruce|Limber pine|Ponderosa pine|Rocky Mountain juniper|Rocky Mountain maple|Subalpine fir|White fir|No live adult trees present)")) %>%
-  group_by(stand) %>%
-  mutate(total = sum(n())) %>%
-  ungroup() %>%
-  unnest(dominant_tree) %>%
-  group_by(stand, dominant_tree) %>%
-  summarise(occurrences = n(),
-            total = unique(total)) %>%
-  group_by(stand) %>%
-  mutate(
-    percent_frequency = occurrences / total,
-    dominant_tree_species = paste0(dominant_tree, ", ", occurrences, " plots, ", round(percent_frequency*100, 2), "% of plots"),
-    rank = ifelse(dominant_tree == "No live adult trees present", occurrences - max(occurrences), occurrences)
-  ) %>%
-  group_by(stand) %>%
-  slice(which.max(rank)) %>%
-  select(stand, dominant_tree_species)
+dominant_tree_species <- dominant_by_stand(stand_data, "dominant_tree", "dominant_tree_species", "No live adult trees present")
 
 
 #### REGENERATION STATISTICS ####
 
 # Step 8: Regeneration presence (Y/N)
-regeneration_presence <- summary_merged %>%
-  filter(!is.na(stand)) %>%
-  group_by(stand) %>%
-  summarise(
-    total_rows = n(),
-    regeneration_rows = sum(regeneration_presence == "Regeneration present"),
-    regeneration_percentage = round((regeneration_rows / total_rows) * 100, 2)
-  ) %>%
-  mutate(
-    regeneration_presence = paste0(regeneration_rows, " plots, ", regeneration_percentage, "% of plots")
-  ) %>%
-  select(stand, regeneration_presence)
+regeneration_presence <- plot_share(stand_data, "regeneration_presence", "Regeneration present")
 
 # Step 9: Average seedlings per acre
-average_seedlings_per_acre <- summary_merged %>%
-  filter(!is.na(stand)) %>%
+average_seedlings_per_acre <- stand_data %>%
   group_by(stand) %>%
   summarise(average_seedlings_per_acre = round(mean(seedlings_per_acre), 2))
 
 # Step 10: Dominant regeneration species
-dominant_regeneration_species <- summary_merged %>%
-  filter(!is.na(stand)) %>%
-  mutate(dominant_regeneration = str_extract_all(dominant_regeneration, "(Aspen|Douglas fir|Colorado Pinyon|Engelmann spruce|Limber pine|Ponderosa pine|Rocky Mountain juniper|Rocky Mountain maple|Subalpine fir|White fir|No live adult trees present)")) %>%
-  group_by(stand) %>%
-  mutate(total = sum(n())) %>%
-  ungroup() %>%
-  unnest(dominant_regeneration) %>%
-  group_by(stand, dominant_regeneration) %>%
-  summarise(occurrences = n(),
-            total = unique(total)) %>%
-  group_by(stand) %>%
-  mutate(
-    percent_frequency = occurrences / total,
-    dominant_regeneration_species = paste0(dominant_regeneration, ", ", occurrences, " plots, ", round(percent_frequency*100, 2), "% of plots"),
-    rank = ifelse(dominant_regeneration == "None", occurrences - max(occurrences), occurrences)
-  ) %>%
-  group_by(stand) %>%
-  slice(which.max(rank)) %>%
-  select(stand, dominant_regeneration_species)
+dominant_regeneration_species <- dominant_by_stand(stand_data, "dominant_regeneration", "dominant_regeneration_species", "None")
 
 
 #### DAMAGE STATISTICS ####
 
 # Step 11: Insect presence (Y/N)
-insect_damage_presence <- summary_merged %>%
-  filter(!is.na(stand)) %>%
-  group_by(stand) %>%
-  summarise(
-    total_rows = n(),
-    insect_rows = sum(insect_damage_presence == "Insect damage present"),
-    insect_percentage = round((insect_rows / total_rows) * 100, 2)
-  ) %>%
-  mutate(
-    insect_damage_presence = paste0(insect_rows, " plots, ", insect_percentage, "% of plots")
-  ) %>%
-  select(stand, insect_damage_presence)
+insect_damage_presence <- plot_share(stand_data, "insect_damage_presence", "Insect damage present")
 
 # Step 12: Browse presence (Y/N)
-browse_damage_presence <- summary_merged %>%
-  filter(!is.na(stand)) %>%
-  group_by(stand) %>%
-  summarise(
-    total_rows = n(),
-    browse_rows = sum(browse_damage_presence == "Browse present"),
-    browse_percentage = round((browse_rows / total_rows) * 100, 2)
-  ) %>%
-  mutate(
-    browse_damage_presence = paste0(browse_rows, " plots, ", browse_percentage, "% of plots")
-  ) %>%
-  select(stand, browse_damage_presence)
+browse_damage_presence <- plot_share(stand_data, "browse_damage_presence", "Browse present")
 
 # Step 13: List of damage types
-list_damage <- summary_merged %>%
-  filter(!is.na(stand)) %>%
+list_damage <- stand_data %>%
   mutate(
     list_damage = tolower(list_damage),
     list_damage = gsub("\\s+", "", list_damage),
   ) %>%
   separate_rows(list_damage, sep = ",") %>%
   mutate(
-    list_damage = case_when(
-      list_damage == "barkbeetle" ~ "bark beetle",
-      list_damage == "douglasfiradelgid" ~ "douglas fir adelgid",
-      list_damage == "mechanicaldamage" ~ "mechanical damage",
-      list_damage == "sprucebudworm" ~ "spruce budworm",
-      list_damage == "winddamage" ~ "wind damage",
-      TRUE ~ NA_character_
-    )
+    list_damage = damage_label(list_damage)
   ) %>%
   distinct(stand, list_damage) %>%
   group_by(stand) %>%
@@ -224,4 +137,4 @@ stand_summary <- stand_summary %>%
   )
 
 # Step 16: Write output to CSV
-write.csv(stand_summary, file = "/Users/harley/Documents/Github/Trinchera_summary/stand_stats/stand_summary.csv", row.names = FALSE)
+write.csv(stand_summary, file = "stand_stats/stand_summary.csv", row.names = FALSE)

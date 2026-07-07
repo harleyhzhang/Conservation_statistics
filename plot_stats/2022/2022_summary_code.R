@@ -1,10 +1,7 @@
-# Load required libraries
-library(dplyr)
-library(tidyr)
-library(stringr)
+source("common.R")
 
 # Step 1: Read in raw/input CSV
-input_data <- read.csv("/Users/harley/Documents/Github/Trinchera_summary/plot_stats/2022/2024Updated_2022_ForestMont_MergedData.csv")
+input_data <- read.csv("plot_stats/2022/2024Updated_2022_ForestMont_MergedData.csv")
 
 input_data <- input_data %>%
   mutate(plot = paste0(plot, "_2022"))
@@ -96,46 +93,7 @@ average_height_ft <- input_data %>%
 dominant_tree_species <- input_data %>%
   filter(living_dead == "L", size_class == "tree", !is.na(species)) %>%
   group_by(plot) %>%
-  summarise(dominant_tree_species = {
-    species_counts <- table(species)
-    max_count <- max(species_counts)
-    most_common_species <- names(species_counts)[species_counts == max_count]
-    percent_frequency <- max_count / length(species) * 100
-    species_name <- switch(most_common_species[1],
-                           "ABCO" = "White fir",
-                           "ABLA" = "Subalpine fir",
-                           "ACGL" = "Rocky Mountain maple",
-                           "JUSC" = "Rocky Mountain juniper",
-                           "PIED" = "Colorado pinyon",
-                           "PIEN" = "Engelmann spruce",
-                           "PIFL" = "Limber pine",
-                           "PIPO" = "Ponderosa pine",
-                           "POTR" = "Aspen",
-                           "PSME" = "Douglas fir")
-    if (percent_frequency <= 50) {
-      second_most_common_species <- names(sort(table(species), decreasing = TRUE))[2]
-      second_max_count <- table(species)[second_most_common_species]
-      second_percent_frequency <- second_max_count / length(species) * 100
-      second_species_name <- switch(second_most_common_species,
-                                    "ABCO" = "White fir",
-                                    "ABLA" = "Subalpine fir",
-                                    "ACGL" = "Rocky Mountain maple",
-                                    "JUSC" = "Rocky Mountain juniper",
-                                    "PIED" = "Colorado pinyon",
-                                    "PIEN" = "Engelmann spruce",
-                                    "PIFL" = "Limber pine",
-                                    "PIPO" = "Ponderosa pine",
-                                    "POTR" = "Aspen",
-                                    "PSME" = "Douglas fir")
-      percent_frequency <- format(round(percent_frequency, 2), nsmall = 2)
-      second_percent_frequency <- format(round(second_percent_frequency, 2), nsmall = 2)
-      paste(species_name, " (", percent_frequency, "%), ", 
-            second_species_name, " (", second_percent_frequency, "%)", sep = "")
-    } else {
-      percent_frequency <- format(round(percent_frequency, 2), nsmall = 2)
-      paste(species_name, " (", percent_frequency, "%)", sep = "")
-    }
-  })
+  summarise(dominant_tree_species = dominant_species(species))
 
 
 #### REGENERATION STATISTICS ####
@@ -160,19 +118,7 @@ dominant_regeneration_species <- input_data %>%
   summarise(regeneration_count = sum(size_class == "sapling") + sum(ifelse(size_class == "seedling", count_seedling, 0))) %>%
   group_by(plot) %>%
   mutate(percent_frequency = regeneration_count / sum(regeneration_count) * 100,
-         species = case_when(
-           species == "ABCO" ~ "White fir",
-           species == "ABLA" ~ "Subalpine fir",
-           species == "ACGL" ~ "Rocky Mountain maple",
-           species == "JUSC" ~ "Rocky Mountain juniper",
-           species == "PIED" ~ "Colorado pinyon",
-           species == "PIEN" ~ "Engelmann spruce",
-           species == "PIFL" ~ "Limber pine",
-           species == "PIPO" ~ "Ponderosa pine",
-           species == "POTR" ~ "Aspen",
-           species == "PSME" ~ "Douglas fir",
-           TRUE ~ as.character(species)
-         )) %>%
+         species = common_names(species)) %>%
   arrange(desc(percent_frequency)) %>%
   summarise(dominant_regeneration_species = {
     if (percent_frequency[1] <= 50) {
@@ -220,4 +166,4 @@ summary_2022 <- summary_2022 %>%
          regeneration_presence = ifelse(is.na(regeneration_presence), "Regeneration absent", regeneration_presence))
 
 # Step 14: Write output to CSV
-write.csv(summary_2022, file = "/Users/harley/Documents/Github/Trinchera_summary/plot_stats/2022/2022_summary.csv", row.names = FALSE)
+write.csv(summary_2022, file = "plot_stats/2022/2022_summary.csv", row.names = FALSE)
